@@ -24,24 +24,14 @@
 package password.pwm.receiver;
 
 import lombok.Getter;
-import password.pwm.util.java.JsonUtil;
+import lombok.Setter;
 
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.Properties;
+import java.time.Instant;
 
 @Getter
-public class TelemetryReceiverSettings {
-    private String ftpSite;
-    private String ftpUser;
-    private String ftpPassword;
-    private String ftpReadPath;
-    private String dataPath;
-
-    static TelemetryReceiverSettings readFromFile(final String filename) throws IOException {
-        final Properties properties = new Properties();
-        properties.load(new FileReader(filename));
-        final String jsonVersion = JsonUtil.serialize(properties);
-        return JsonUtil.deserialize(jsonVersion, TelemetryReceiverSettings.class);
-    }
+@Setter
+public class Status {
+    private String errorState;
+    private String lastFtpStatus;
+    private Instant lastFtpIngest;
 }

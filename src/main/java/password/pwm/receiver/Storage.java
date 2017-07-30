@@ -46,7 +46,7 @@ public class Storage {
     private final Environment environment;
     private Store store;
 
-    public Storage(final TelemetryReceiverSettings settings) throws IOException {
+    public Storage(final Settings settings) throws IOException {
         final String path = settings.getDataPath();
 
         final File dataPath = new File(path);
@@ -54,7 +54,7 @@ public class Storage {
             throw new IOException("data path '" + dataPath + "' does not exist");
         }
 
-        final File stoagePath = new File(dataPath.getAbsolutePath() + File.pathSeparator + "/storage");
+        final File stoagePath = new File(dataPath.getAbsolutePath() + File.separator + "storage");
         stoagePath.mkdir();
 
         final EnvironmentConfig environmentConfig = new EnvironmentConfig();

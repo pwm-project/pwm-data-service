@@ -47,7 +47,7 @@ public class TelemetryViewerServlet extends HttpServlet {
         final PwmReceiverApp app = contextManager.getApp();
 
         {
-            final String errorState = app.getErrorState();
+            final String errorState = app.getStatus().getErrorState();
             if (!StringUtil.isEmpty(errorState)) {
                 resp.sendError(500, errorState);
                 final String htmlBody = "<html>Error: " + errorState + "</html>";

@@ -6,6 +6,8 @@
 <%@ page import="java.time.Instant" %>
 <%@ page import="java.time.LocalDateTime" %>
 <%@ page import="java.time.format.FormatStyle" %>
+<%@ page import="password.pwm.receiver.PwmReceiverApp" %>
+<%@ page import="password.pwm.receiver.ContextManager" %>
 <%--
   ~ Password Management Servlets (PWM)
   ~ http://www.pwm-project.org
@@ -30,14 +32,22 @@
   --%>
 
 <!DOCTYPE html>
-<%@ page language="java" session="true" isThreadSafe="true"
-         contentType="text/html" %>
+<%@ page contentType="text/html" %>
 <% SummaryBean summaryBean = (SummaryBean)request.getAttribute(TelemetryViewerServlet.SUMMARY_ATTR); %>
-<html>
+<% PwmReceiverApp app = ContextManager.getContextManager(request.getServletContext()).getApp(); %>
+        <html>
 <body>
 <div>
-    <%=LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)%>
+    Current Time: <%=LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)%>
     <br/>
+    <% if (app.getSettings().isFtpEnabled()) {%>
+    <% Instant lastIngest = app.getStatus().getLastFtpIngest(); %>
+    Last FTP Ingestion: <%= lastIngest == null ? "n/a" : lastIngest.toString()%>
+    <br/>
+    Last FTP Status: <%= app.getStatus().getLastFtpStatus()%>
+    <br/>
+    <br/>
+    <% } %>
     Server Count = <%=summaryBean.getServerCount()%>
     <h2>Summary Data</h2>
     <table border="1">

@@ -30,9 +30,11 @@ import password.pwm.PwmConstants;
 import password.pwm.bean.TelemetryPublishBean;
 import password.pwm.util.java.JsonUtil;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -43,54 +45,65 @@ public class FtpDataReader {
 
     private static final Logger LOGGER = Logger.createLogger(FtpDataReader.class.getName());
 
-    private final TelemetryReceiverSettings telemetrySettings;
+    private final Settings telemetrySettings;
+    private final PwmReceiverApp app;
 
-    public FtpDataReader(final TelemetryReceiverSettings telemetrySettings) {
-
+    public FtpDataReader(final PwmReceiverApp app, final Settings telemetrySettings) {
+        this.app = app;
         this.telemetrySettings = telemetrySettings;
     }
 
     public void readData(final Storage storage) {
+        app.getStatus().setLastFtpStatus("beginning read process");
+        app.getStatus().setLastFtpIngest(Instant.now());
         try {
             final FTPClient ftpClient = getFtpClient();
             final List<String> files = getFiles(ftpClient);
-            ftpClient.disconnect();
             for (final String fileName : files) {
                 if (fileName != null && fileName.endsWith(".zip")) {
-                    final FTPClient loopClient = getFtpClient();
-                    readFile(loopClient, fileName, storage);
-                    loopClient.disconnect();
+                    app.getStatus().setLastFtpIngest(Instant.now());
+                    app.getStatus().setLastFtpStatus("reading file " + fileName);
+                    readFile(ftpClient, fileName, storage);
                 } else {
                     LOGGER.info("skipping ftp file " + fileName);
                 }
             }
+            ftpClient.disconnect();
+            app.getStatus().setLastFtpStatus("completed successfully");
+            app.getStatus().setLastFtpIngest(Instant.now());
 
         } catch (Exception e) {
-            e.printStackTrace();
+            app.getStatus().setLastFtpIngest(Instant.now());
+            app.getStatus().setLastFtpStatus("error during ftp scan: " + e.getMessage());
         }
     }
 
     private void readFile(final FTPClient ftpClient, final String fileName, final Storage storage) throws IOException {
-        try (InputStream inputStream = ftpClient.retrieveFileStream(fileName)) {
-            try {
-                final ZipInputStream zipInputStream = new ZipInputStream(inputStream);
-                final ZipEntry zipEntry = zipInputStream.getNextEntry();
-                final String zipEntryName = zipEntry.getName();
-                if (zipEntryName != null && zipEntryName.endsWith(".json")) {
-                    LOGGER.info("reading ftp file " + fileName + ":" + zipEntryName);
-                    final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                    final byte[] buffer = new byte[1024];
-                    int len;
-                    while ((len = zipInputStream.read(buffer)) > 0) {
-                        byteArrayOutputStream.write(buffer, 0, len);
-                    }
-                    final String resultsStr = byteArrayOutputStream.toString(PwmConstants.DEFAULT_CHARSET.name());
-                    final TelemetryPublishBean bean = JsonUtil.deserialize(resultsStr, TelemetryPublishBean.class);
-                    storage.store(bean);
+        final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        ftpClient.retrieveFile(fileName, byteArrayOutputStream);
+        final ByteArrayInputStream inputStream = new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
+        readZippedByteStream(inputStream, fileName, storage);
+    }
+
+    private void readZippedByteStream(final InputStream inputStream, final String fileName, final Storage storage) {
+        try {
+            final ZipInputStream zipInputStream = new ZipInputStream(inputStream);
+            final ZipEntry zipEntry = zipInputStream.getNextEntry();
+            final String zipEntryName = zipEntry.getName();
+            if (zipEntryName != null && zipEntryName.endsWith(".json")) {
+                LOGGER.info("reading ftp file " + fileName + ":" + zipEntryName);
+                final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                final byte[] buffer = new byte[1024];
+                int len;
+                while ((len = zipInputStream.read(buffer)) > 0) {
+                    byteArrayOutputStream.write(buffer, 0, len);
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
+                final String resultsStr = byteArrayOutputStream.toString(PwmConstants.DEFAULT_CHARSET.name());
+                final TelemetryPublishBean bean = JsonUtil.deserialize(resultsStr, TelemetryPublishBean.class);
+                storage.store(bean);
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

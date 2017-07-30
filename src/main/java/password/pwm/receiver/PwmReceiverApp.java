@@ -31,44 +31,44 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class PwmReceiverApp {
-    private static final String ENV_NAME = "DATA_SERVICE_PROS";
+    private static final String ENV_NAME = "DATA_SERVICE_PROPS";
 
     private Storage storage;
     private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-    private TelemetryReceiverSettings settings;
-    private String errorState;
+    private Settings settings;
+    private Status status = new Status();
 
     public PwmReceiverApp() {
         final String propsFile = System.getenv(ENV_NAME);
         if (StringUtil.isEmpty(propsFile)) {
-            errorState = "Missing environment variable '" + ENV_NAME + "', can't load configuration";
+            status.setErrorState("Missing environment variable '" + ENV_NAME + "', can't load configuration");
             return;
         }
 
         try {
-            settings = TelemetryReceiverSettings.readFromFile(propsFile);
+            settings = Settings.readFromFile(propsFile);
         } catch (IOException e) {
-            errorState = "can't read configuration: " + e.getMessage();
+            status.setErrorState("can't read configuration: " + e.getMessage());
             return;
         }
 
         try {
             storage = new Storage(settings);
         } catch (Exception e) {
-            errorState = "can't start storage system: " + e.getMessage();
+            status.setErrorState("can't start storage system: " + e.getMessage());
             return;
         }
 
         if (settings.getFtpSite() != null && !settings.getFtpSite().isEmpty()) {
             final Runnable ftpThread = () -> {
-                final FtpDataReader ftpDataReader = new FtpDataReader(settings);
+                final FtpDataReader ftpDataReader = new FtpDataReader(this, settings);
                 ftpDataReader.readData(storage);
             };
             scheduledExecutorService.scheduleAtFixedRate(ftpThread, 0, 1, TimeUnit.HOURS);
         }
     }
 
-    public TelemetryReceiverSettings getSettings() {
+    public Settings getSettings() {
         return settings;
     }
 
@@ -76,12 +76,12 @@ public class PwmReceiverApp {
         return storage;
     }
 
-    public String getErrorState() {
-        return errorState;
-    }
-
     void close() {
         storage.close();
         scheduledExecutorService.shutdown();
+    }
+
+    public Status getStatus() {
+        return status;
     }
 }
